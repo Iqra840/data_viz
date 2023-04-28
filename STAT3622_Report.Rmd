@@ -1,0 +1,1179 @@
+---
+title: STAT3622 Report- An in-depth analysis of global air and plastic pollution
+subtitle: by Iqra Abbasi
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+<style type="text/css">
+  body{
+  font-size: 14pt;
+  font-family: Helvetica ;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, fig.width=12, fig.height=8) 
+
+
+
+```
+
+## The motivation and objective
+
+Pollution, both in gaseous and plastic forms, has been a well-known and perhaps one of the most dire global challenges of modern society. Interestingly, pollution emission and waste mismanagement can  be traced to countries over a span of multiple years to better understand the highest sources of emitters over a period of time.
+
+The aim of this project is thus to track different geographic regions across the globe and study their emission behaviors over time. This involves first using datasets related to plastic production to investigate plastic waste trends, and then to look at Greenhouse Gas (GHG) emissions without land use, land use change, and forestry (LULUCF) to infer air pollution levels by different countries, and how these measurements impact their rank in the World Air Quality Index.
+
+## The Datasets Used
+The data used in this project comes from publicly-available, well-trusted datasets. Because this project consists of both air pollution and plastic pollution analysis, datasets relating to both air and plastic production were acquired, the details of which are listed below:
+
+1. Global plastic production and mismanaged plastic waste per person by country from 1990 to 
+2015 (Source: [Our World in Data](https://ourworldindata.org/plastic-pollution))\
+2. Global pollutant emissions including GHG emissions by country from 1990 to 2014 (Source: 
+[UN Data](http://data.un.org/Explorer.aspx))\
+3. Air Pollution Rank by country (Source: [World Air Quality Index](https://waqi.info/#/c/7.693/34.246/2.2z))\
+
+A preview of of the datasets is shown below. Plastic waste and mismanaged plastic waste are taken to be in per million tonnes and gaseous emissions are measured in kilotonnes. Additionally, rank for each country is taken from the World Air Quality index that classifies countries into one of four groups: Good, Moderate, Unhealthy (for sensitive groups) and Unhealthy. 
+
+
+```{r summary, echo=FALSE}
+library(dplyr)
+print('Snippet of unprocessed data for mismanaged plastic waste')
+mmpw<-read.csv('mwgt.csv')
+names_spaced<-c('Country'	,'Total_MismanagedPlasticWaste_2010<br/>..millionT.',	'Total_MismanagedPlasticWaste_2019<br/>..millionT.',	
+                'Mismanaged_PlasticWaste_PerCapita<br/>_2010..kg.per.year.', 'Mismanaged_PlasticWaste_PerCapita<br/>_2019..kg.per.year.')
+knitr::kable(head(mmpw)) 
+
+print('Snippet of total global mismanaged plastic waste')
+mwgt<-read.csv('mismanaged-waste-global-total.csv')
+knitr::kable(head(mwgt))
+
+print('Snippet of unprocessed data for per-capica plastic waste for each country')
+pwpc<-read.csv('plastic-waste-per-capita.csv')
+knitr::kable(head(pwpc))
+
+print('Snippet of unprocessed greenhouse gas emissions for eaach country from 1990 to 2014')
+gh<-read.csv('gh.csv')
+names_spaced<-c('country',	'year'	,'CO2_without_<br/>LULUCF_in_kilotonne_co2_equivalent',	'GHGs_in_kilotonne<br/>_co2_equivalent',	'HFCs_without<br/>_LULUCF_in_kilotonne_co2_equivalent',	'CH4_without_<br/>LULUCF_in_kilotonne_co2_equivalent',	'N2O_without<br/>_LULUCF_in_kilotonne_co2_equivalent',	'SF6_without_LULUCF<br/>_in_kilotonne_co2_equivalent')
+gh<-gh[,1:8]
+knitr::kable(head(gh))
+
+```
+
+
+## Preprocessing and preparing data for visualising
+After loading in the data, several preprocessing steps were applied to facilitate various types of visualisations, including:
+
+1. Imputing missing values (taking mean if missing value is in time-series format).\
+
+2. Converting datasets to ‘long’ format for plotting trends of explanatory variables (such as each row representing a year and its row values containing the emission values of the countries in that year).\
+
+3. Joining world rank index with the GHG emissions dataset for classification models.\
+
+
+## Analyzing Global mismanaged waste and global plastic production:
+The following line and bar plot shows the trend in global plastic waste production over the years. The plots show a clear growing trend overall which has seen an accelerated increase especially after the late 90s.
+
+&nbsp;
+
+
+```{r lineplotandbar, echo=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(packcircles)
+library(randomcoloR)
+library(dplyr)
+library(reshape2)
+library(scales)
+library(tidyr)
+
+plastic_waste<-read.csv('plastic-waste-per-capita.csv')
+gpp<-read.csv('global-plastics-production.csv')
+
+
+#line plot
+
+ggplot(gpp, aes(x = Year, y = Global.plastics.production..million.tonnes., group = 1)) +
+  
+  geom_line(color = "#8C271E") +
+  
+  labs(x = "Year", y = "Global plastics production (million tonnes)", title = "Trend in global plastics production over the years") +
+  
+  theme_minimal() +
+  
+  theme(
+    
+    panel.grid.major = element_blank(),
+    
+    panel.grid.minor = element_blank(),
+    
+    panel.background = element_rect(fill = "#f5e5c6", color = NA)
+    
+  )
+
+# Creating the bar plot
+
+ggplot(gpp, aes(x = Year, y = Global.plastics.production..million.tonnes., fill = factor(Year))) +
+  
+  geom_bar(stat = "identity") +
+  
+  scale_fill_manual(values = c("#8c2d04", "#b35806", "#ce661a", "#e08214", "#e89e18", "#f3b41a",
+                               
+                               "#fdc826", "#ffe659", "#ffea8c", "#ffefbf", "#fef5d5", "#fef5e5",
+                               
+                               "#fdebd9", "#fde4cc", "#fddcbd", "#fccead", "#f7c19a", "#f2b58c",
+                               
+                               "#edaa7c", "#e99f6c", "#e3945e", "#df8a51", "#d87f44", "#d2743b",
+                               
+                               "#c96832", "#c15d29", "#b75221", "#af471b", "#a63d14", "#9e3310",
+                               
+                               "#951c0d", "#8d0f0b", "#820b09", "#780807", "#6d0606", "#630505",
+                               
+                               "#580404", "#4e0303", "#440202", "#3a0202", "#2f0202", "#240101",
+                               
+                               "#1a0101", "#100101", "#0d0303", "#0a0606", "#076969", "#053d3d",
+                               
+                               "#031f1f", "#020101", "#030201", "#050403", "#080605", "#0b0907",
+                               
+                               "#0f0c08", "#131008", "#17130b", "#1b150d", "#1f180f", "#231b11",
+                               
+                               "#281e13", "#2c2115", "#312418", "#36271a", "#3b2b1c", "#402e1e",
+                               
+                               "#463120", "#4b3422", "#503824")) +
+  
+  theme_bw() +
+  
+  theme(panel.background = element_rect(fill = "#f5e5c6"),
+        
+        panel.grid.major = element_blank(),
+        
+        panel.grid.minor = element_blank(),
+        
+        legend.position = "none",
+        
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  
+  labs(x = "Year", y = "Global plastics production (million tonnes)",
+       
+       title = "Global plastics production by year")
+```
+
+\newpage
+
+
+Another way to better understand the trend of plastic pollution is the per capita waste generated by a person for each day for every country. The darker the shade, the higher the proportion of plastic waste generated by the country. The plot below indicates that countries such as the United States and Germany have a higher per capita plastic waste generation per day. There is no data available for countries that are greyed out, and many countries in Africa and Asia fall in the 0-0.25 kg threshold of plastic waste production per day.
+
+&nbsp;
+
+```{r chloropeth, echo=FALSE}
+#chloropeth plastic-waste-per-capita
+
+library(tidyverse)
+
+library(sf)
+
+library(rnaturalearth)
+
+library(rnaturalearthdata)
+library(dplyr)
+# Load the world map data
+
+world <- ne_download(scale = 110, type = "countries", returnclass = "sf")
+
+# Join the data with the world map data
+
+joined_data <- world %>% left_join(plastic_waste, by = c("ADM0_A3" = "Code"))
+
+# Create a color palette
+
+
+palette<- c("#FFB347", "#FFA07A", "#FF7F50", "#FF6347", "#FF4500")
+
+ggplot(joined_data) +
+  
+  geom_sf(aes(fill = `Per.capita.plastic.waste..kg.person.day.`)) +
+  
+  scale_fill_gradientn(colors = palette, na.value = "grey50", limits = c(0, 1)) +
+  
+  labs(title = "Per capita plastic waste (kg/person/day)",
+       
+       subtitle = "Year: 2010",
+       
+       fill = "Kg/person/day",
+       
+       caption = "Data source: provided by user") +
+  
+  theme_void() +
+  
+  theme(plot.title = element_text(size = 16, face = "bold"),
+        
+        plot.subtitle = element_text(size = 12),
+        
+        plot.caption = element_text(size = 10),
+        
+        legend.position = "bottom")
+
+
+```
+\newpage
+
+It is also useful to compare how mismanaged plastic waste has changed across an extended period of time. Here, mismanaged waste refers to waste that ended up in landfills or in the ocean. The plot below shows data points for each country, and a clear positive relationship is seen between the amount of mismanaged plastic waste in 2010 and that in 2019. Another observation is that there are only a few countries with a net plastic waste higher than 2500000 million tonnes, and that most are clustered around the origin.
+
+&nbsp;
+
+
+```{r scatterplastic_2019vs2010, echo=FALSE}
+plastic_waste<-read.csv('mismanaged_plasticwaste.csv')
+
+ggplot(plastic_waste, aes(x = Total_MismanagedPlasticWaste_2010..millionT., y = Total_MismanagedPlasticWaste_2019..millionT.)) +
+  
+  geom_point(aes(color = Mismanaged_PlasticWaste_PerCapita_2010..kg.per.year.), size = 4) +
+  
+  scale_color_gradient2(low = "#FFC300", mid = "#FF5733", high = "#C70039", midpoint = mean(plastic_waste$Mismanaged_PlasticWaste_PerCapita_2010..kg.per.year.), name = "Mismanaged Plastic Waste Per Capita 2010") +
+  
+  labs(title = "Total Mismanaged Plastic Waste in 2010 vs 2019",
+       
+       x = "Total Mismanaged Plastic Waste in 2010 (millionT)",
+       
+       y = "Total Mismanaged Plastic Waste in 2019 (millionT)") +
+  
+  theme(panel.background = element_rect(fill = "#F5DEB3"))
+
+
+
+
+```
+\newpage
+
+
+
+
+To analyze how countries' mismanaged global waste production varies by continent, it is useful to utilize R's 'countrycode' library to attach the continent of each country to the dataframe in a separate column called 'Continent'. By grouping the data points by continent and making the following plots, we see that Asia is ahead of other continents in terms of countries with high-producing mismanaged waste, and China is far ahead of other countries in terms of the mismanaged waste it produces.
+
+
+&nbsp;
+
+
+```{r dist_by_continent, echo=FALSE, out.width='100%'}
+
+library(ggrepel)
+library(countrycode)
+df<-read.csv('mismanaged-waste-global-total.csv')
+
+df$Continent <- countrycode(sourcevar=df$Entity, origin="country.name", destination="continent")
+df <- df %>% drop_na()
+
+df <- df %>%
+  
+  arrange(Continent, desc(`Mismanaged.waste....global.total.`)) %>%
+  
+  group_by(Continent)
+
+
+
+#another scatter by continent mismanaged waste
+
+ggplot(df, aes(x = Continent, y = Mismanaged.waste....global.total., color = Continent)) +
+  
+  geom_point() +
+  
+  scale_color_manual(values = c("#FFA07A", "#E9967A", "#CD5C5C", "#8B0000", "#A0522D", "#8B4513")) +
+  
+  theme_bw() +
+  
+  labs(x = "Continent", y = "Mismanaged Waste", title = "Mismanaged Waste by Continent") +geom_text_repel(data = . %>% 
+                    mutate(label = ifelse( Mismanaged.waste....global.total. > 2,
+                                          Entity, "")),
+                  aes(label = label), 
+                  box.padding = 1,
+                  show.legend = FALSE)+
+  
+  theme(plot.title = element_text(hjust = 0.5),
+        
+        panel.grid.major = element_line(colour = "gray", linetype = "dashed"))
+
+```
+\newpage
+
+It is worth noting that plastic waste per capita is not the same measurement as mismanaged waste. Plastic waste per capita can be an indicator of waste generated, but that waste can be recycled or repurposed. Mismanaged waste, on the other hand, is waste that goes directly to landfills or the ocean. The circular-packing graph and pie chart below capture these differences - China takes the lead in mismanaged global waste according to the pie chart, and the circular packing chart shows that countries such as Kuwait and Germany produce the most plastic waste per capita -they do not necessarily have high values of mismanaged waste, suggesting that they have adequate measurements in place to repurpose the plastic waste produced.
+
+&nbsp;
+
+```{r pie_and_circular_packing, echo=FALSE}
+#circle packing
+library(packcircles)
+library(randomcoloR)
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+library(scales)
+library(tidyr)
+
+plastic_waste<-read.csv('plastic-waste-per-capita.csv')
+pck <- circleProgressiveLayout(plastic_waste$Per.capita.plastic.waste..kg.person.day., sizetype='area')
+mydata <- cbind(plastic_waste, pck)
+myPlotCord <- circleLayoutVertices(pck)
+
+palette <- randomColor(186, hue = "red", luminosity = "light")
+pl <- ggplot(repr.plot.width = 8, repr.plot.height = 8)
+
+pl <- pl + geom_polygon(data = myPlotCord, aes(x, y, group = id, fill= as.factor(id)))
+
+pl <- pl + geom_text(data = mydata, aes(x, y, size = 0.05, label = Entity)) 
+
+pl <- pl + scale_size_continuous(range = c(2,4))
+
+pl <- pl + coord_equal()
+
+pl <- pl + theme_void()
+
+pl <- pl + theme(legend.position="none")
+
+pl <- pl + labs(title ="Circular packing chart")
+
+pl <- pl + labs(subtitle ="Per capita plastic waste (kg/person/day)")
+
+pl <- pl + labs(caption =paste('For entity',max(mydata$Entity)))
+
+pl <- pl + scale_fill_manual(values= palette)
+
+pl
+
+
+library(plotly)
+df<-read.csv('mismanaged-waste-global-total.csv')
+# Define custom color palette
+
+colors <- c('#F5B041', '#DC7633', '#BA4A00', '#784212', '#4A2D0F')
+
+# Create pie chart with custom colors and country labels
+
+
+
+fig <- plot_ly(df, labels = ~Entity, values = ~Mismanaged.waste....global.total., type = 'pie',
+               
+               textposition = 'inside',
+               
+               
+               
+               textinfo = 'label')
+
+fig <- fig %>% layout(title = 'Mismanaged Waste by Entity',
+                      
+                      paper_bgcolor='rgba(0,0,0,0)',
+                      
+                      plot_bgcolor='rgba(0,0,0,0)', showlegend=FALSE)
+
+
+# Show the chart
+
+fig
+
+
+
+
+
+```
+
+
+To better study the similarity of countries according to the cluster they belong to, hierarchical clustering is used. Because a value of the optimal number of clusters is not known, a dendrogram is first created using Ward's method. Results from the dendrogram show three distinct clusters. We therefore go ahead and assign three clusters to our dataframe using the K-means method, and get the following plot as a result. The data is divided into three distinct clusters - countries with high plastic waste per capita can now be distinguished from countries with medium and low plastic waste per capita.
+
+&nbsp;
+
+```{r clust, echo=FALSE}
+
+df<-read.csv('plastic-waste-per-capita.csv')
+
+# Read in data frame and remove unnecessary columns
+df <- df[, c("Entity", "Code", "Year", "Per.capita.plastic.waste..kg.person.day.")]
+
+# Standardize data
+
+df_std <- scale(df[, 4])
+
+# Hierarchical clustering
+
+hc <- hclust(dist(df_std), method = "ward.D2")
+
+
+
+plot(hc, hang = -1, main = "Dendrogram (3 clusters)", labels = FALSE, col = "#DAA520")
+
+rect.hclust(hc, k = 3, border = "red")
+
+
+library('ggrepel')
+
+# K-means clustering
+
+set.seed(123)
+
+kmeans_clust <- kmeans(df_std, centers = 3)
+
+autumn_pal <- c("#F67280", "#C06C84", "#6C5B7B")
+
+df <- cbind(df, df_std)
+
+df$cluster <- as.factor(kmeans_clust$cluster)
+
+df$index <- row.names(df)
+
+g <- ggplot(df, aes(x = index, y = df_std, color = factor(cluster), label = Entity)) +
+  
+  geom_point(size = 3) +
+  
+  scale_color_manual(values = autumn_pal) +
+  
+  theme_classic() +
+  
+  labs(title = "K-means Clusters",
+       
+       x = "Index",
+       
+       y = "Per Capita Plastic Waste (kg/person/day)",
+       
+       color = "Cluster") +
+  
+  geom_text_repel(size = 2, show.legend = FALSE, segment.alpha = 0, max.overlaps = 100)
+
+g + theme(axis.text.x=element_blank())
+
+
+
+```
+\newpage
+
+
+One study that can be done from the data sources we have is to evaluate if a country's GDP corresponds with the plastic waste per capita produces. By plotting GDP against plastic waste per captia, and plotting a line of best fit using linear regression, we see that there is a clear positive relationship between GDP per capita and plastic waste generated per capita. We also notice that the confidence interval of the best fit line is also relatively wide, and that data points are not tightly bound towards the generated line, showing that there are variations from the coefficients that the linear regression model predicted. The poor linear relationship is also justified by the R squared value of just 0.12.
+
+
+&nbsp;
+
+```{r reg, echo=FALSE}
+
+library(ggpmisc)
+#regression
+pwpc<-read.csv('plastic-waste-per-capita.csv')
+
+mwgt<-read.csv('mismanaged-waste-global-total.csv')
+
+merged_df <- merge(pwpc, mwgt, by = "Code")
+
+
+
+merged_df <- merged_df[c("Entity.x", "Year.x", "Code", "Per.capita.plastic.waste..kg.person.day.", "Mismanaged.waste....global.total.")]
+
+colnames(merged_df)[which(colnames(merged_df) == "Entity.x")] <- "Entity"
+
+
+
+colnames(merged_df)[which(colnames(merged_df) == "Year.x")] <- "Year"
+
+pcpw_gdp = read.csv("per-capita-plastic-waste-vs-gdp-per-capita.csv")
+
+
+df<- pcpw_gdp[complete.cases(pcpw_gdp[, c('GDP.per.capita..PPP..constant.2011.international...', 'Total.population..Gapminder..HYDE...UN.')]), ]
+
+
+df <- df[df$Year == 2010, ]
+
+df <- df[, !(names(df) %in% c("Per.capita.plastic.waste..kg.person.day.", "Continent"))]
+
+
+final_df <- merge(merged_df, df, by="Code")
+
+final_df <- dplyr::rename(final_df, "Entity" = "Entity.x","Year" = "Year.x", "Plastic waste per Person(kg/day)" = "Per.capita.plastic.waste..kg.person.day.", "GDP per capita in PPP" = "GDP.per.capita..PPP..constant.2011.international...", "Total population"="Total.population..Gapminder..HYDE...UN.")
+
+
+library(ggrepel)
+
+a <- ggplot(final_df, aes(x=`GDP per capita in PPP`, y=`Plastic waste per Person(kg/day)`)) + 
+  
+  geom_point(aes(color=`Mismanaged.waste....global.total.`), size=3) +
+  
+  scale_color_gradient(low = "#FFCC66", high = "#B31B1B", guide = "legend") +
+  
+  stat_poly_line(color='red', size=1.5) +
+  stat_poly_eq(use_label(c("eq", "R2")), label.x.npc = "right") +
+  
+  geom_text_repel(aes(label=`Entity`), box.padding = 0.35, point.padding = 0.5, force = 2.5) +
+  
+  theme_light() +
+  
+  theme(panel.background = element_rect(fill = "#F5DEB3"),
+        
+        panel.grid.major = element_line(colour = "#FFFFFF"),
+        
+        panel.grid.minor = element_line(colour = "#FFFFFF"),
+        
+        axis.line = element_line(colour = "#000000"),
+        
+        axis.text = element_text(colour = "#000000"),
+        
+        axis.title = element_text(colour = "#000000"),
+        
+        legend.position = "bottom",
+        
+        legend.text = element_text(colour = "#000000"),
+        
+        legend.title = element_text(colour = "#000000"),
+        
+        plot.title = element_text(hjust = 0.5, size=16, face="bold"))
+
+
+
+a <- a + ggtitle("Relationship between Plastic Waste and GDP per Capita") +
+  
+  xlab("GDP per capita (PPP, constant 2011 international $)") +
+  
+  ylab("Plastic Waste per Person (kg/day)") 
+
+
+a
+
+```
+
+
+
+## Exploring Green House Emissions across countries
+
+To now explore the emission of green house gases and other gaseous pollutants across countries, we create line plots for each pollutant, for each country. The following line plot produces the trend of CO2 emission without land use change (this dataset looks at gaseous emissions without those contributing to Land use, land-use change, and forestry, or LULUCF, as human-induced land use is necessary for economic and social development and cannot be avoided). Plotting CO2 emissions without land use change shows that there has generally been a steadily slow decline, and the net emissions by European Union countries signified by the green line has seen a dramatic drop in CO2 emissions, while emissions from USA saw a gradual drop but shows a gradual recent increase.
+&nbsp;
+
+```{r lp1, echo=FALSE}
+library(ggthemes)
+#line plot co2 emissions wo lulucf
+df<-read.csv('a.csv')
+
+
+df <- df[1:39, ]
+
+# Reshape data to long format
+data_long <- pivot_longer(df, cols = -country, names_to = "year", values_to = "value")
+
+# Convert year column to numeric
+data_long$year <- as.numeric(gsub("X", "", data_long$year))
+
+# Sort data by year in descending order
+data_long <- data_long[order(data_long$year, decreasing = TRUE),]
+
+
+
+
+p<-ggplot(data_long, aes(x = year, y = value, color = country)) +
+  geom_line(size=1.5) +theme_fivethirtyeight() +  theme(axis.text.x = element_text(size=8,angle=45), 
+        legend.text= element_text(size=10), 
+        panel.background = element_rect(fill = "#FEF2DA"), 
+        plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA"))+
+  labs(x = "Year", y = "Value", title = "CO2 emissions without land use change")+ theme(panel.background = element_rect(fill = "#FEF2DA"))
+p
+
+
+
+```
+\newpage
+
+Next, plotting total Greenhouse Gas (GHG) emissions without land use change for each country shows that there has also been a general decline. The European Union in particular can be seen as having a dramatic decline from its previously high numbers here. The USA on the other hand continues having steady numbers since 2010.
+
+&nbsp;
+
+
+```{r lp2, echo=FALSE}
+
+df<-read.csv('b.csv')
+
+
+df <- df[1:37, ]
+
+# Reshape data to long format
+data_long <- pivot_longer(df, cols = -country, names_to = "year", values_to = "value")
+
+# Convert year column to numeric
+data_long$year <- as.numeric(gsub("X", "", data_long$year))
+
+# Sort data by year in descending order
+data_long <- data_long[order(data_long$year, decreasing = TRUE),]
+
+
+
+p<-ggplot(data_long, aes(x = year, y = value, color = country)) +
+  geom_line(size=1.5)+theme_fivethirtyeight() +  theme(axis.text.x = element_text(size=8,angle=45), 
+        legend.text= element_text(size=10), 
+        panel.background = element_rect(fill = "#FEF2DA"), 
+        plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")) +
+  labs(x = "Year", y = "Value", title = "Total GHG emissions without land use change")+ theme(panel.background = element_rect(fill = "#FEF2DA"))
+p
+
+
+
+```
+\newpage
+
+
+HFC emissions is also a type of greenhouse gas that can trap heat, and plotting its emissions over the years shows that it started fluctuating in the late 90s, and Denmark surprisingly saw a dramatic increase then sharp decline for HFC emissions in the past 30 years. But perhaps the most noteworthy is the emissions by USA; it has seen steady growth since the 90s and surpasses all other countries by a huge margin.
+
+&nbsp;
+
+```{r lp3, echo=FALSE}
+
+#line plot co2 emissions wo lulucf
+df<-read.csv('c.csv')
+
+
+df <- df[1:39, ]
+
+# Reshape data to long format
+data_long <- pivot_longer(df, cols = -country, names_to = "year", values_to = "value")
+
+# Convert year column to numeric
+data_long$year <- as.numeric(gsub("X", "", data_long$year))
+
+# Sort data by year in descending order
+data_long <- data_long[order(data_long$year, decreasing = TRUE),]
+
+
+
+
+p<-ggplot(data_long, aes(x = year, y = value, color = country)) +
+  geom_line(size=1.5) +theme_fivethirtyeight() +  theme(axis.text.x = element_text(size=8,angle=45), 
+        legend.text= element_text(size=10), 
+        panel.background = element_rect(fill = "#FEF2DA"), 
+        plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA"))+
+  labs(x = "Year", y = "Value", title = "HFC emissions without land use change")+ theme(panel.background = element_rect(fill = "#FEF2DA"))
+p
+
+
+
+```
+\newpage
+
+By tracking CH4 emissions, on the other hand, we see that there are three leading drivers for CH4 emissions: the Russian Federation, the USA, and the European Union. The Russian Federation saw a moderate decline but has been climbing up in terms of its CH4 emissions, and the European Union is still steadily seeing declining numbers for CH4. The USA is also far ahead in terms of CH4 emissions, though there are signs of slow decrease over the past few decades.
+
+&nbsp;
+
+```{r lp4, echo=FALSE}
+
+#line plot co2 emissions wo lulucf
+df<-read.csv('d.csv')
+
+
+df <- df[1:39, ]
+
+# Reshape data to long format
+data_long <- pivot_longer(df, cols = -country, names_to = "year", values_to = "value")
+
+# Convert year column to numeric
+data_long$year <- as.numeric(gsub("X", "", data_long$year))
+
+# Sort data by year in descending order
+data_long <- data_long[order(data_long$year, decreasing = TRUE),]
+
+
+
+
+p<-ggplot(data_long, aes(x = year, y = value, color = country)) +
+  geom_line(size=1.5)+theme_fivethirtyeight() +  theme(axis.text.x = element_text(size=8,angle=45), 
+        legend.text= element_text(size=10), 
+        panel.background = element_rect(fill = "#FEF2DA"), 
+        plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")) +
+  labs(x = "Year", y = "Value", title = "CH4 emissions without land use change")+ theme(panel.background = element_rect(fill = "#FEF2DA"))
+p
+
+
+
+```
+\newpage
+For N2O emissions, we again see that the European Union , the USA, and the Russian Federation take the lead against other countries. Russia and the European Union have been seeing a steady decline in N2O emissions since the late 80s. The N2O emissions produced by US have seen recent fluctuations, but no significant decrease. Other countries have also been experiencing a decline in N2O emissions.
+
+&nbsp;
+
+```{r lp5, echo=FALSE}
+
+#line plot co2 emissions wo lulucf
+df<-read.csv('e.csv')
+
+
+df <- df[1:39, ]
+
+# Reshape data to long format
+data_long <- pivot_longer(df, cols = -country, names_to = "year", values_to = "value")
+
+# Convert year column to numeric
+data_long$year <- as.numeric(gsub("X", "", data_long$year))
+
+# Sort data by year in descending order
+data_long <- data_long[order(data_long$year, decreasing = TRUE),]
+
+
+
+
+p<-ggplot(data_long, aes(x = year, y = value, color = country)) +
+  geom_line(size=1.5) +theme_fivethirtyeight() +  theme(axis.text.x = element_text(size=8,angle=45), 
+        legend.text= element_text(size=10), 
+        panel.background = element_rect(fill = "#FEF2DA"), 
+        plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA"))+
+  labs(x = "Year", y = "Value", title = "N2O emissions without land use change")+ theme(panel.background = element_rect(fill = "#FEF2DA"))
+p
+
+
+
+```
+\newpage
+
+Finally, by looking at  SF6 trends over the years, we see that most countries saw a sharp increase in SF6 emissions at around late 1990s, followed by a rapid recent decline. The US had the highest rate of SF6 emissions, after which it saw a steep decline in the early 90s. Japan, the European Union, and Germany in particular saw steep peaks in SF6 emissions at the turn of the century, followed by a slow decline.
+
+&nbsp;
+
+```{r lp6, echo=FALSE}
+
+
+df<-read.csv('g.csv')
+
+
+df <- df[1:38, ]
+df <- df %>% 
+     mutate_at(c(2:25), as.numeric)
+# Reshape data to long format
+data_long <- pivot_longer(df, cols = -country, names_to = "year", values_to = "value")
+
+# Convert year column to numeric
+data_long$year <- as.numeric(gsub("X", "", data_long$year))
+
+# Sort data by year in descending order
+data_long <- data_long[order(data_long$year, decreasing = TRUE),]
+
+data_long <- subset(data_long, year > 1) 
+
+
+p<-ggplot(data_long, aes(x = year, y = value, color = country)) +
+  geom_line(size=1.5) +theme_fivethirtyeight() +  theme(axis.text.x = element_text(size=8,angle=45), 
+        legend.text= element_text(size=10), 
+        panel.background = element_rect(fill = "#FEF2DA"), 
+        plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA"))+
+  labs(x = "Year", y = "Value", title = "SF6 emissions without land use change")+ theme(panel.background = element_rect(fill = "#FEF2DA"))
+p
+
+
+
+```
+
+\newpage
+After examining the distribution of emissions by country across several years, we look at the combined greenhouse emission trend globally. This involves summing up all the emission values over the years to visualize the overall trend from 1990 to 2014. We therefore see not only the individual emissions, but all of them combined to form the total GHG emissions. From the generated line plot, we see that CO2 emissions without LULUCF are the biggest contributors of net Greenhouse Gases (the lines in green), and CH4 is the second biggest driver, though it is far behind CO2. 
+
+
+&nbsp;
+```{r ghg1, echo=FALSE}
+
+library(gridExtra)
+library(viridis)
+library(ggthemes)
+library(RColorBrewer)
+library(gridExtra)
+library(grid)
+library(plyr)
+library(rworldmap)
+
+df<-read.csv('greenhouse_gas_inventory_data_data.csv',sep=',',stringsAsFactors=F)
+df2<-df %>% mutate(
+  category = recode(category,
+                    carbon_dioxide_co2_emissions_without_land_use_land_use_change_and_forestry_lulucf_in_kilotonne_co2_equivalent="CO2s emissions w/o LULUCF",
+                    greenhouse_gas_ghgs_emissions_including_indirect_co2_without_lulucf_in_kilotonne_co2_equivalent='GHGs emissions including indirect CO2 w/o LULUCF',
+                    greenhouse_gas_ghgs_emissions_without_land_use_land_use_change_and_forestry_lulucf_in_kilotonne_co2_equivalent='GHGs emissions w/o LULUCF',
+                    hydrofluorocarbons_hfcs_emissions_in_kilotonne_co2_equivalent='HFCs emissions',
+                    methane_ch4_emissions_without_land_use_land_use_change_and_forestry_lulucf_in_kilotonne_co2_equivalent='CH4s emissions w/o LULUCF',
+                    nitrogen_trifluoride_nf3_emissions_in_kilotonne_co2_equivalent='HF3s emissions',
+                    nitrous_oxide_n2o_emissions_without_land_use_land_use_change_and_forestry_lulucf_in_kilotonne_co2_equivalent='N2Os emissions w/o LULUCF',
+                    perfluorocarbons_pfcs_emissions_in_kilotonne_co2_equivalent='PFCs emissions',
+                    sulphur_hexafluoride_sf6_emissions_in_kilotonne_co2_equivalent='SF6 emissions',
+                    unspecified_mix_of_hydrofluorocarbons_hfcs_and_perfluorocarbons_pfcs_emissions_in_kilotonne_co2_equivalent='Unspecified mix of HFCs and PFCs emissions'))
+df2$country_or_area<-tolower(df2$country_or_area)
+colnames(df2)[1]<-'region'
+df2[df2$region=='russian federation','region']<-'russia'
+df2[df2$region=='united kingdom','region']<-'uk'
+df2[df2$region=='united states of america','region']<-'usa'
+#remove this country since it does not fit within a map
+df2_clean <- df2 %>% filter(region!='european union')
+library("ggthemes")
+f<-df2_clean %>% 
+  dplyr::group_by(category,year) %>% 
+  dplyr::summarize(sumValue = sum(value)) %>% 
+  ggplot(aes(x=factor(year),y=sumValue,group=category)) + 
+  geom_line(aes(color=category),size=1.5) + 
+  geom_point(size=1.,color='black') + 
+  scale_color_brewer(name='',palette='Paired') + 
+  theme(legend.position='right') + 
+  theme_fivethirtyeight() + 
+  theme(axis.text.x = element_text(size=8,angle=45), 
+        legend.text= element_text(size=10), 
+        panel.background = element_rect(fill = "#FEF2DA"), 
+        plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")) + 
+  labs(title='International Greenhouse gas Emissions', 
+       subtitle= 'in kilotons CO2 equivalent, summed by all countries per year') + 
+  guides(color=guide_legend(ncol=3))
+
+f
+
+```
+\newpage
+
+We next visualize the distribution of CO2 emissions and compare the median and mean values of this distribution. From the line plot, the median value seems to have been more steady over the years than the mean value. We also see that the median is greater than the mean in this distribution, and this significant difference between the two shows the effect that outliers can have on the mean of the data.
+
+&nbsp;
+
+
+```{r gh21, echo=FALSE}
+
+res<-df2_clean %>% filter(category=='CO2s emissions w/o LULUCF') %>% group_by(year) %>% mutate(meanVal = mean(value), medianVal = median(value))
+g0<-res %>% filter(year==1990) %>% ggplot(aes(x=value)) + geom_histogram(bins=100) + geom_vline(xintercept=res$meanVal,color="#377EB8",size=2) + geom_vline(xintercept=res$medianVal,color="#E41A1C",size=2) + theme_fivethirtyeight() + theme(legend.position='None') + theme(legend.text= element_text(size=8),
+                                                                                                                                                                                                                                                                               panel.background = element_rect(fill = "#FEF2DA"), 
+                                                                                                                                                                                                                                                                               plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")) + labs(title= 'Comparison between median and mean values',subtitle ='CO2 emissions w/o LULUCF, year=1990, all Countries')
+
+g1<-df2_clean %>% filter(category=='CO2s emissions w/o LULUCF') %>% dplyr::group_by(year) %>% dplyr::summarize(medianValue = median(value),meanValue = mean(value)) %>% reshape2::melt(id=c('year')) %>% ggplot(aes(x=factor(year),y=value,color= variable,group=variable)) + geom_line(size=1.5,alpha=.85) + geom_point(size=1.,color='black') + theme_fivethirtyeight() + scale_color_brewer(name='',palette='Set1')  +theme(axis.text.x = element_text(size=8,angle=45),axis.text.y = element_text(size=8),
+                                                                                                                                                                                                                                                                                                                                                                                                                               panel.background = element_rect(fill = "#FEF2DA"), 
+                                                                                                                                                                                                                                                                                                                                                                                                                               plot.background = element_rect(fill = "#f5e5c6"),legend.background = element_rect(fill = "#FEF2DA")) + ylim(0,400000)
+g0 + annotation_custom(grob = ggplotGrob(g1), xmin = 1.5e6, xmax = 5.5e6, ymin = 2.5, ymax = 12)
+
+
+
+
+```
+
+\newpage
+To look at emissions of a particular case, we look at emissions produced by USA. We see that GHG emissions were steadily increasing until 2008-2009, after which it slowly declined but has picked up in the past decade. Since the line trend for CO2 is similar to that of all GHG emissions, it is reasonable to assume that the increase in GHG emissions was heavily driven by the increase in CO2 emissions for this case.
+
+&nbsp;
+
+```{r usghg, echo=FALSE}
+#us case
+f<-df2_clean %>% filter(region=='usa') %>% dplyr::group_by(category,year) %>% ggplot(aes(x=factor(year),y=value,group=category)) + geom_line(aes(color=category),size=1.5) + geom_point(size=1.,color='black') + scale_color_brewer(name='',palette='Paired') + theme(legend.position='right') + theme_fivethirtyeight() + theme(axis.text.x = element_text(size=8,angle=45),legend.text= element_text(size=10), 
+                                                                                                                                                                                                                                                                                                                                 panel.background = element_rect(fill = "#FEF2DA"), 
+                                                                                                                                                                                                                                                                                                                                 plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")) + labs(title='USA Greenhouse gas Emissions', subtitle= 'in kilotons CO2') + guides(color=guide_legend(ncol=3))
+f
+                                
+
+```
+\newpage
+
+To further investigate CO2 emissions, we plot CO2 emissions as boxplots for each year, and see that USA has consistently been in the upper end of the box plot, showing that it has heavily been contributing towards global CO2 emissions.
+
+&nbsp;
+
+```{r ghg3, echo=FALSE}
+
+temp<-data.frame(df2_clean %>% filter(category=='CO2s emissions w/o LULUCF') %>% dplyr::group_by(year))
+temp<-temp %>% arrange(year)
+
+#function to find the max per year
+listDf<-list()
+uniqueYears<-sort(unique(temp$year))
+for(i in 1:length(uniqueYears)){
+  listDf[[i]]<- temp %>% filter(year == uniqueYears[i])
+  listDf[[i]]$isMax<-ifelse(listDf[[i]]$region == listDf[[i]][which.max(listDf[[i]]$value),]$region,'yes','no')
+}
+res<-do.call(rbind,listDf)
+
+
+res %>% dplyr::group_by(year) %>% ggplot(aes(x=factor(year),y=value,color=value)) + geom_boxplot(alpha=.5,size=.25) + geom_jitter(shape=16,position=position_jitter(0.2),size=1.5) + theme_fivethirtyeight() + theme(legend.position='None') + theme(axis.text.x = element_text(size=8,angle=45),legend.text= element_text(size=10), 
+                                                                                                                                                                                                                                                     panel.background = element_rect(fill = "#FEF2DA"), 
+                                
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                          plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")) + labs(title='CO2 Emissions w/o LULUCF', subtitle= 'in kilotons CO2 equivalent') + guides(color=guide_legend(ncol=3)) + geom_label_repel(aes(label = ifelse(isMax=='yes',region,'')), alpha=.75, force=2) + scale_y_log10()  + scale_color_gradientn(name="",colours=rev(viridis::inferno(20)))
+library(RColorBrewer)
+
+
+
+```
+\newpage
+
+We can also create a stacked histogram by country and year to see which countries are the top three contributors of CO2. As we can see, the top three contributors are USA (by a huge margin), Russia, and Japan.
+
+&nbsp;
+
+```{r ghg5, echo=FALSE}
+
+library(RColorBrewer)
+
+#CO2 emissions comparision by country
+s<-df2_clean %>% filter(category=='CO2s emissions w/o LULUCF') %>% dplyr::group_by(year,region) %>% ggplot(aes(x=factor(year),y=value)) + geom_histogram(aes(fill=region),stat='identity',position="fill",linewidth=1.5) + theme_fivethirtyeight() + theme(legend.position='bottom',axis.text.x = element_text(size=8,angle=45),legend.text= element_text(size=10),legend.key.size = unit(.1, "cm"), 
+                                                                                                                                                                                                                                                           panel.background = element_rect(fill = "#FEF2DA"),  plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")) + labs(title='CO2s emissions w/o LULUCF',subtitle='contribution by country, normalized to unity') + guides(fill=guide_legend(ncol=13)) + scale_fill_manual(name="",values = colorRampPalette(brewer.pal(9,'Paired'))(42))
+
+s
+
+
+
+
+```
+
+By using a world map to compare CO2 emissions, we also see how CO2 levels have changed across the years in a manner that is easy to visualise at a global level. We see that primarily, Russia's CO2 emissions have declined in 2014 since 1990, and some other countries saw slighter declines.
+
+&nbsp;
+
+
+```{r ghgmap, echo=FALSE}
+
+wMap <- map_data("world")
+wMap$region<-tolower(wMap$region)
+
+year1990<- df2_clean %>% filter(year==1990 &category == 'CO2s emissions w/o LULUCF')
+year1990_map<-left_join(wMap,year1990,by='region')
+
+year2014<- df2_clean %>% filter(year==2014 &category == 'CO2s emissions w/o LULUCF')
+year2014_map<-left_join(wMap,year2014,by='region')
+
+
+t<-ggplot() + geom_polygon(data = year1990_map, aes(x = long, y = lat, group = group, fill = value),colour = "black", size = 0.1) + scale_fill_gradientn(name="",colours=rev(viridis::inferno(20)),na.value="gray100") + theme_fivethirtyeight() + theme(legend.position='right',legend.direction='vertical',axis.text=element_blank(),
+                                                                                                                                                                                                                                             panel.background = element_rect(fill = "#FEF2DA"), 
+                                                                                                                                                                                                                                             plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA") ) + labs(title='CO2s emissions w/o LULUCF',subtitle='in kiloton, year 1990')
+
+
+
+u<-ggplot() + 
+  geom_polygon(data = year2014_map, aes(x = long, y = lat, group = group, fill = value),colour = "black", size = 0.1) + scale_fill_gradientn(name="",colours=rev(viridis::inferno(20)),na.value="gray100") + theme_fivethirtyeight() + theme(legend.position='right',legend.direction='vertical',axis.text=element_blank(),
+                                                                                                                                                                                                                                             panel.background = element_rect(fill = "#FEF2DA"), 
+                                                                                                                                                                                                                                             plot.background = element_rect(fill = "#FFFFFF"),legend.background = element_rect(fill = "#FEF2DA")
+  ) + labs(title='CO2s emissions w/o LULUCF',subtitle='in kiloton, year 2014')
+t
+u
+
+```
+
+## Classification
+
+By using data from the World Air Quality Index, which classifies countries as 'Good', 'Moderate', 'Unhealthy (for sensitive groups)', and 'Unhealthy' based on the quantity and types of pollutants emitted, this section attempts to classify the countries present in our dataset into one of the four groups. The first choice was random forest, and after performing random forest classification on the merged dataset, we get an accuracy of 100 percent, signifying that the model may not be picking up sufficient details to produce a more realistic accuracy rate. After running feature importance on the random forest model, we see that CO2 and CH4 bore roughly the same importance, with other emissions being much less important for the model.
+
+
+```{r rf, echo=FALSE}
+
+library(randomForest)
+#random forest
+df <- read.csv("ghg.csv", header = TRUE)
+df$Air.Quality.Index <- as.factor(df$Air.Quality.Index)
+model <- randomForest(Air.Quality.Index ~ co2 + ghg_co2 + ghg + hfcs + ch4 + n2o + sf6, data = df, ntree = 500)
+predictions <- predict(model, df)
+
+confusion_matrix <- table(predictions, df$Air.Quality.Index)
+
+accuracy <- mean(predictions == df$Air.Quality.Index)
+#Print accuracy
+
+
+# Get importance
+importance    <- importance(model)
+
+varImportance <- data.frame(Variables = row.names(importance), 
+                            Importance = round(importance[ ,'MeanDecreaseGini'],2))
+
+# Create a rank variable based on importance
+rankImportance <- varImportance %>%
+  mutate(Rank = paste0('#',dense_rank(desc(Importance))))
+
+my_colors <- c( "#F67280", "#C06C84", "#6C5B7B", "#355C7D")
+
+
+# Plot the variable importance
+ggplot(rankImportance, aes(x = reorder(Variables, Importance), 
+                              y = Importance, fill = Importance)) +
+  geom_bar(stat='identity') + 
+  geom_text(aes(x = Variables, y = 0.5, label = Rank),
+            hjust=0, vjust=0.55, size = 4, colour = 'red') +
+  labs(x = 'Variables') +
+  coord_flip() + 
+  scale_fill_gradientn(colors = my_colors) +
+  theme_classic()
+
+confusion_matrix <- table(predictions, df$Air.Quality.Index)
+
+#confusion matrix
+print(paste("Random Forest Accuracy:", round(accuracy * 100, 2), "%"))
+
+
+```
+
+
+After Random Forest, SVM was tested to see if the countries can be correctly categorized into their correct groups. The kernel chosen was 'polynomial', and the results from the confusion matrix with the accuracy of 37.5% shows that the model was moderately effective in predicting the ranks: a lot of its predictions were 'Moderate' and while it was good at correctly predicting the 'Moderate' rank, it also frequently predicted 'Moderate' as 'Good'. 
+
+
+
+```{r svm, echo=FALSE}
+
+#svm
+df <- read.csv("ghg.csv", header = TRUE)
+df$Air.Quality.Index <- as.factor(df$Air.Quality.Index)
+
+# Install and load the e1071 package
+library(e1071)
+
+# Split the data into training and testing sets
+set.seed(123)
+train_index <- sample(1:nrow(df), 0.3 * nrow(df))
+train_data <- df[train_index, ]
+test_data <- df[-train_index, ]
+# Train the SVM model
+svm_model <- svm(Air.Quality.Index ~ co2 + ghg_co2 + ghg + hfcs + ch4 + n2o + sf6, data = train_data, kernel = "polynomial")
+
+# Make predictions on the testing set
+svm_predictions <- predict(svm_model, test_data)
+
+# Calculate the accuracy
+svm_accuracy <- mean(svm_predictions == test_data$Air.Quality.Index)
+
+# Print the confusion matrix and accuracy
+svm_confusion_matrix <- table(svm_predictions, test_data$Air.Quality.Index)
+print(paste("SVM Accuracy:", round(svm_accuracy * 100, 2), "%"))
+
+
+# Convert the confusion matrix to a data frame
+confusion_df <- data.frame(
+  Prediction = rep(colnames(svm_confusion_matrix), each = nrow(svm_confusion_matrix)),
+  Actual = rep(rownames(svm_confusion_matrix), times = ncol(svm_confusion_matrix)),
+  Value = as.vector(svm_confusion_matrix)
+)
+
+my_palette <- c("#F8B195", "#F67280", "#C06C84", "#6C5B7B", "#355C7D")
+
+# Plot confusion matrix
+ggplot(confusion_df, aes(x = Prediction, y = Actual, fill = Value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradientn(colors = my_palette) +
+  labs(x = "Predicted", y = "Actual", title = "SVM Confusion Matrix") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.title = element_blank(),
+        legend.position = "right")
+```
+
+
+Decision trees were also tested for this classification problem, and they delivered a significantly better accuracy of 67.5%. Moreover, the confusion matrix indicates that it was mostly able to classify 'Moderate' and 'Good' ranks, but attributed the 'Good' rank to both the 'Unhealthy' ranks, making it weaker in terms of ranking countries that are in the 'Unhealthy' category.
+
+
+```{r decision_tree, echo=FALSE}
+library(rpart)
+
+# Train the decision tree
+tree <- rpart(Air.Quality.Index ~ co2 + ghg_co2 + ghg + hfcs + ch4 + n2o + sf6, data = df, method = "class")
+
+# Make predictions on the test data
+predictions <- predict(tree, newdata = df[, 1:8], type = "class")
+
+# Create a confusion matrix
+conf_matrix <- table(df$Air.Quality.Index, predictions)
+
+accuracy <- sum(diag(conf_matrix)) / sum(conf_matrix)
+
+
+paste0("Decision Tree Accuracy: ", round(accuracy * 100, 2), "%")
+confusion_df <- data.frame(
+  Prediction = rep(colnames(conf_matrix), each = nrow(conf_matrix)),
+  Actual = rep(rownames(conf_matrix), times = ncol(conf_matrix)),
+  Value = as.vector(conf_matrix)
+)
+
+ggplot(confusion_df, aes(x = Prediction, y = Actual, fill = Value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradientn(colors = my_palette) +
+  labs(x = "Predicted", y = "Actual", title = "Decision Tree Confusion Matrix") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14, face = "bold"),
+        legend.title = element_blank(),
+        legend.position = "right")
+
+
+```
+
+
+Next, we look at the Naive Bayes classifier to see if it performs better. The Naive Bayes assumes independence among all the factors and is a relatively simpler model better for classifying smaller datasets such as ours. Results from the confusion matrix and the accuracy rate of 50% shows that it was moderately effective in classifying the countries correctly. It performed well for the 'Good' category but performed poorly for the 'Unhealthy' category. A constant poor performance for the 'Unhealthy' category is because there were only a few training samples of this category in the dataset, making the models weaker towards classifying it correctly.
+
+
+
+```{r nb, echo=FALSE}
+set.seed(123)
+train_index <- sample(1:nrow(df), 0.6 * nrow(df))
+train_data <- df[train_index, ]
+test_data <- df[-train_index, ]
+
+# Train the Naive Bayes model
+library(e1071)
+nb_model <- naiveBayes(Air.Quality.Index ~ co2 + ghg_co2 + ghg + hfcs + ch4 + n2o + sf6, data = train_data)
+
+# Make predictions on the testing set
+nb_predictions <- predict(nb_model, test_data)
+
+# Evaluate the accuracy of the model
+nb_confusion_matrix <- table(nb_predictions, test_data$Air.Quality.Index)
+nb_accuracy <- sum(diag(nb_confusion_matrix)) / sum(nb_confusion_matrix)
+print(paste("Naive Bayes Accuracy:", round(nb_accuracy * 100, 2), "%"))
+
+# Convert the confusion matrix to a data frame
+confusion_df <- as.data.frame.matrix(nb_confusion_matrix)
+confusion_df$Actual <- rownames(confusion_df)
+
+# Melt the data for plotting
+melted_df <- reshape2::melt(confusion_df, id.vars = "Actual", variable.name = "Prediction", value.name = "Value")
+
+# Create the plot
+r<-ggplot(melted_df, aes(x = Prediction, y = Actual, fill = Value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "#F8B195", high = my_colors, guide = "colorbar") +
+  labs(x = "Predicted", y = "Actual", title = "Naive Bayes Confusion Matrix") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+r
+
+
+
+
+
+```
+
+
+
+Another way of classifying these ranks is by considering a 'One-vs-All' approach when classifying; specifically, we train separate models as binary classifiers to detect one of the four categories. We select decision trees for its relatively better performance for this approach, and the ROC AUC curves generated below show that a one-vs-all approach performs much better at classifying countries according to their ranks. If one wanted to correctly classify a country in the 'Unhealthy (for sensitive groups)' category, the sample will be passed to all four models, and a 'True' value will be generated only by the 'Unhealthy (for sensitive groups)' model. 
+
+
+
+
+```{r dt_ALL, echo=FALSE}
+
+#############binary classifier using decision tree
+data<-read.csv('ghg.csv')
+library(pROC)
+library(rpart)
+target_levels <- unique(data$Air.Quality.Index)
+models <- list()
+roc_curves <- list()
+par(mfrow = c(2, 2))
+# Loop over each target value
+for (i in seq_along(target_levels)) {
+  # Create a new target variable based on whether it matches the current target value
+  target_var <- ifelse(data$Air.Quality.Index == target_levels[i], "Yes", "No")
+  # Train a decision tree model on the training data
+  model <- rpart(target_var ~ ., data = data, method = "class",
+                 control = rpart.control(cp = 0.001), parms = list(split = "information"))
+  # Save the model to the list
+  models[[i]] <- model
+  # Predict the probabilities of the positive class for the test data
+  prob <- predict(model, newdata = data, type = "prob")[,2]
+  # Calculate the ROC curve and AUC
+  roc_curve <- roc(data$Air.Quality.Index == target_levels[i], prob, levels = c(TRUE, FALSE))
+  # Save the ROC curve to the list
+  roc_curves[[i]] <- roc_curve
+  # Print the AUC and plot the ROC curve
+  
+  plot(roc_curve, main = paste0("ROC curve for ", target_levels[i]), print.auc = TRUE)
+}
+
+```
+
+From the above analyses and computations, we can make the final inferences:
+1. A 'one-vs-all' model using decision trees is more reliable for classification of countries' ranks rather than using models for multi-class classification.
+2. a country's GDP bears a positive relationship with per capita plastic waste production, but the positive relation is not tightly bound across all countries.
+3. A country's per capita plastic waste is not the same indicator of its mismanaged waste.
+4. The general trend of greenhouse gases is slightly declining, but Carbon Dioxide remains the biggest contributor to GreenHouse Gas emissions, and the USA continues to emit the most amount of CO2 by a large margin.
